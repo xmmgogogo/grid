@@ -292,8 +292,12 @@ def order_check_in(ex, row, one_grid_amount, grid_list):
                         return
 
                     func.trace_log("[buy]订单成交，挂[sell]下单返回:" + json.dumps(take_order))
-                    # 写入数据库
+                    # 写入新订单
                     func.create_order(conn, take_order['id'], "sell", cur_price, one_grid_amount, line_num + 1)
+                else:
+                    func.trace_log("[buy]订单成交，不需要挂上格[sell]，已存在")
+            else:
+                func.trace_log(f"""[buy]订单成交，越界判断，当前网格：{line_num}""")
         elif side == "sell":
             func.trace_log('[sell]订单成交，订单ID='+order_id)
 
@@ -312,9 +316,17 @@ def order_check_in(ex, row, one_grid_amount, grid_list):
                         return
 
                     func.trace_log("[sell]订单成交，挂[buy]下单返回:" + json.dumps(take_order))
-                    # 写入数据库
+                    # 写入新订单
                     func.create_order(conn, take_order['id'], "buy", cur_price, one_grid_amount, line_num - 1)
+                else:
+                    func.trace_log("[sell]订单成交，不需要挂下格[buy]，已存在")
+            else:
+                func.trace_log(f"""[sell]订单成交，越界判断，当前网格：{line_num}""")
+
+        # 删除旧订单
+        func.del_order(conn, order_id)
     elif order_status == 'canceled':
+        # 删除旧订单
         func.del_order(conn, order_id)
 
 
