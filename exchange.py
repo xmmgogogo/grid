@@ -91,3 +91,22 @@ class Exchange:
             func.trace_log("批量撤销所有订单失败，" + str(e), "error")
 
         return
+
+    # 获取成交明细
+    def fetch_order_trades(self, order_id):
+        try:
+            # [{'id': '312859507982378',
+            #   'info': {'symbol': 'trxusdt', 'fee-currency': 'trx', 'source': 'spot-api', 'match-id': '107271058164',
+            #            'role': 'taker', 'price': '0.059253', 'created-at': '1626339343866',
+            #            'order-id': '320917647469696', 'fee-deduct-state': 'done', 'trade-id': '100594126634',
+            #            'filled-amount': '313.78', 'filled-fees': '0.62756', 'filled-points': '0.0',
+            #            'fee-deduct-currency': '', 'id': '312859507982378', 'type': 'buy-limit'},
+            #   'order': '320917647469696', 'timestamp': 1626339343866, 'datetime': '2021-07-15T08:55:43.866Z',
+            #   'symbol': 'TRX/USDT', 'type': 'limit', 'side': 'buy', 'takerOrMaker': 'taker', 'price': 0.059253,
+            #   'amount': 313.78, 'cost': 18.59240634, 'fee': {'cost': 0.62756, 'currency': 'TRX'}}]
+
+            return self.exchange.fetch_order_trades(order_id)
+        except Exception as e:
+            func.trace_log("获取成交明细失败，" + str(e), "error")
+
+        return

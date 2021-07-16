@@ -1,5 +1,12 @@
+import math
 import time
 import logging
+
+
+# 四舍五入取小
+def round_down(value, n):
+    return math.floor(value * 10 ** n) / (10 ** n)
+    pass
 
 
 # 初始化基础配置
@@ -42,7 +49,8 @@ def init_db(conn):
     try:
         conn.cursor().execute('''CREATE TABLE "config" (
           "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-          "is_run" INTEGER
+          "is_run" INTEGER,
+          "buy_fee" real
         );''')
         conn.commit()
         print("config 创建成功")
@@ -80,14 +88,15 @@ def get_order_by_line(conn, line_num):
     cursor.execute(f"""SELECT * FROM orders where line_num = {line_num}""")
     return cursor.fetchone()
 
+
 # num=1
-def add_config(conn, num):
+def add_config(conn, num, buy_fee):
     if get_config(conn) is not None:
         # 更新
-        sql = f"""update config set is_run = {num}"""
+        sql = f"""update config set is_run = {num}, buy_fee = {buy_fee}"""
         pass
     else:
-        sql = f"""INSERT INTO config(is_run) VALUES ({num})"""
+        sql = f"""INSERT INTO config(is_run, buy_fee) VALUES ({num}, {buy_fee})"""
     conn.cursor().execute(sql)
     conn.commit()
     pass

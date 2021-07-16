@@ -93,15 +93,17 @@ def main():
 
         # 交易对基础币种计数精度（小数点后位数），限价买入、限价卖出、市价卖出数量使用
         price_precision = int(market_symbol_info.get("info").get("price-precision"))
+        # 交易数额精度错误
+        amount_precision = int(market_symbol_info.get("info").get("amount-precision"))
         # 交易对限价单和市价买单最小下单金额 ，以计价币种为单位
         min_order_value = float(market_symbol_info.get("info").get("min-order-value"))
         # 交易对限价单最小下单量 ，以基础币种为单位（NEW）
         min_order_amt = float(market_symbol_info.get("info").get("limit-order-min-order-amt"))
-        func.trace_log(f"""精度:{price_precision}, 最小下注数量:{min_order_amt}, 最小下注金额:{min_order_value}""")
+        func.trace_log(f"""价格精度:{price_precision}, 数量精度:{amount_precision}, 最小下注:{min_order_amt}, 最小金额:{min_order_value}""")
 
         # （10000 - 5000)/(6-1) = 1000
-        step = round(float((grid_max_price - grid_min_price) / (grid_num - 1)), price_precision)
-        func.trace_log("网格区间范围和步长" + json.dumps([grid_min_price, grid_max_price, grid_num - 1, step]))
+        step = func.round_down(float((grid_max_price - grid_min_price) / (grid_num - 1)), price_precision)
+        func.trace_log("网格区间范围和单格价差" + json.dumps([grid_min_price, grid_max_price, grid_num - 1, step]))
 
         # 组装网格，至少2个格子
         grid_list = []
@@ -110,12 +112,12 @@ def main():
             tmp_price = grid_min_price + step * i
             if tmp_price > grid_max_price:
                 tmp_price = grid_max_price
-            grid_list.append(round(tmp_price, price_precision))
-            total_price += round(tmp_price, price_precision)
+            grid_list.append(func.round_down(tmp_price, price_precision))
+            total_price += func.round_down(tmp_price, price_precision)
         func.trace_log("新网格价格" + json.dumps(grid_list))
 
         # 计算每个格子挂单数量，总投入金额 / 格子价格总价值
-        one_grid_amount = round(grid_money / total_price, price_precision)
+        one_grid_amount = func.round_down(grid_money / total_price, amount_precision)
         func.trace_log("投入金额，单网格挂单数量" + json.dumps([grid_money, one_grid_amount]))
 
         # 同时对最小投入金额做了限定
@@ -156,7 +158,7 @@ def main():
         func.trace_log("首次挂单，购买多少份:" + str(grid_num - num))
 
         # 首次挂单购买总数量
-        first_buy_price = round(now_price * 1.005, price_precision)
+        first_buy_price = func.round_down(now_price * 1.005, price_precision)
         buy_num = one_grid_amount * (grid_num - num)
         func.trace_log("首次挂单，挂单价格和数量" + json.dumps([first_buy_price, buy_num]))
 
@@ -175,13 +177,14 @@ def main():
 
             #  确认购买订单之后，开始挂单
             while True:
-                order_status = ex.fetch_order_status(take_order['id'])
-                func.trace_log("首次下单数据，订单状态"+order_status)
-                if order_status == "closed":
-                    func.add_config(conn, 1)
-                    project_config = func.get_config(conn)
-                    func.trace_log("首次挂单已全部交易成功")
+                first_order_info = ex.fetch_order(take_order['id'])
+                func.trace_log("首次下单数据，订单返回信息："+json.dumps(first_order_info))
+                if first_order_info is not None and first_order_info.get("status") == "closed":
+                    # 顺便计算当前买币手续费
+                    buy_fee_rate = float(first_order_info.get("fee").get("cost") / first_order_info.get("amount"))
 
+                    func.add_config(conn, 1, buy_fee_rate)
+                    func.trace_log("首次挂单已全部交易成功")
                     break
                 time.sleep(0.5)
 
@@ -189,26 +192,32 @@ def main():
             func.trace_log("首次下单数据异常，请重试", "error")
             pass
 
+        # 兼容修改，fix tuple not update
+        project_config = func.get_config(conn)
+        is_run_step = project_config[1]
+        buy_fee_rate = project_config[2]
+
         # 开始挂买单和卖单
-        if project_config[1] == 1:
+        if is_run_step == 1:
             func.trace_log("--->挂网格开始<---")
             num = 0
             for cur_price in grid_list:
-                func.trace_log(f"""轮询挂单，现价{now_price}:，挂单价{cur_price}:，挂单数量{one_grid_amount}""")
-                # 表示购买比例
                 if cur_price > now_price:
                     # 里面挂卖单
-                    take_order = ex.create_order("limit", "sell", one_grid_amount, cur_price)
+                    tmp_one_grid_amount = func.round_down(one_grid_amount * (1-buy_fee_rate), amount_precision)  # 扣手续费
+                    func.trace_log(f"""轮询挂[sell]单，现价{now_price}:，挂单价{cur_price}:，计划挂单数量{tmp_one_grid_amount}""")
+                    take_order = ex.create_order("limit", "sell", tmp_one_grid_amount, cur_price)
                     if take_order is None:
-                        func.trace_log("[sell]初始下单失败," + json.dumps([one_grid_amount, cur_price]))
+                        func.trace_log("[sell]初始下单失败," + json.dumps([tmp_one_grid_amount, cur_price]))
                         return
 
                     func.trace_log("[sell]下单信息:" + json.dumps(take_order))
                     # 写入数据库
-                    func.create_order(conn, take_order['id'], "sell", cur_price, one_grid_amount, num + 1)
+                    func.create_order(conn, take_order['id'], "sell", cur_price, tmp_one_grid_amount, num + 1)
                     pass
                 else:
                     # 外面挂买单
+                    func.trace_log(f"""轮询挂[buy]单，现价{now_price}:，挂单价{cur_price}:，计划挂单数量{one_grid_amount}""")
                     take_order = ex.create_order("limit", "buy", one_grid_amount, cur_price)
                     if take_order is None:
                         func.trace_log("[buy]初始下单失败," + json.dumps([one_grid_amount, cur_price]))
@@ -217,15 +226,15 @@ def main():
                     func.trace_log("[buy]下单信息:" + json.dumps(take_order))
                     # 写入数据库
                     func.create_order(conn, take_order['id'], "buy", cur_price, one_grid_amount, num + 1)
-                # add++
+                # add++ 累加计数
                 num += 1
 
-            # 设置数据库状态
-            project_config[1] = 2
-            func.add_config(conn, 2)
+            # 设置config运行状态
+            func.add_config(conn, 2, buy_fee_rate)
+            is_run_step = 2
 
         # 单子都挂好了，下一步就是开始轮询，监控每一笔订单，如果当前单子成交了，则根据当前单子的类型，决定挂上线还是下线
-        if project_config[1] == 2:
+        if is_run_step == 2:
             while True:
                 # 实时读取配置，如果已关闭策略则进行相关动作
                 cf.read(conf_file_name)
@@ -236,7 +245,7 @@ def main():
                 results = func.get_all_order(conn)
                 for row in results:
                     # 业务处理层
-                    order_check_in(ex, row, one_grid_amount, grid_list)
+                    order_check_in(ex, row, one_grid_amount, grid_list, buy_fee_rate, amount_precision)
                     time.sleep(5)
     except Exception as e:
         # func.trace_log("主进程异常退出，" + str(e))
@@ -244,7 +253,7 @@ def main():
 
 
 # 订单业务逻辑
-def order_check_in(ex, row, one_grid_amount, grid_list):
+def order_check_in(ex, row, one_grid_amount, grid_list, buy_fee_rate, amount_precision):
     order_id = row[1]
     side = row[2]
     price = row[3]
@@ -285,6 +294,8 @@ def order_check_in(ex, row, one_grid_amount, grid_list):
                 # 需要判断上一层有没有挂单，如果挂了，则不挂
                 order_info = func.get_order_by_line(conn, line_num + 1)
                 if order_info is None:
+                    # 挂卖单需要计算手续费扣除情况
+                    one_grid_amount = func.round_down(one_grid_amount * (1-buy_fee_rate), amount_precision)
                     func.trace_log(f"""[buy]订单成交，挂[sell]价格:{cur_price}，[sell]数量:{one_grid_amount}""")
                     take_order = ex.create_order("limit", "sell", one_grid_amount, cur_price)
                     if take_order is None:
@@ -332,7 +343,7 @@ def order_check_in(ex, row, one_grid_amount, grid_list):
 
 # 关闭程序，完成清理工作
 def close_process(ex):
-    func.trace_log("关闭程序，完成清理工作")
+    func.trace_log("已手动关闭挂单程序，开始清理工作")
 
     # 取消全部挂单
     ex.batch_cancel_open_orders()
@@ -340,6 +351,8 @@ def close_process(ex):
     # 清空数据库订单表
     func.del_all_order(conn)
     func.del_config(conn)
+
+    func.trace_log("清理工作，已完成")
     pass
 
 
