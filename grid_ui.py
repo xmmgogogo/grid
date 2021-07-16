@@ -98,9 +98,9 @@ class Ui_MainWindow(object):
         self.stop_btn.setFont(font)
         self.stop_btn.setCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
         self.stop_btn.setObjectName("stop_btn")
-        self.textEdit = QtWidgets.QTextEdit(self.centralwidget)
-        self.textEdit.setGeometry(QtCore.QRect(470, 30, 411, 421))
-        self.textEdit.setObjectName("textEdit")
+        self.textBrowser = QtWidgets.QTextBrowser(self.centralwidget)
+        self.textBrowser.setGeometry(QtCore.QRect(430, 20, 451, 441))
+        self.textBrowser.setObjectName("textBrowser")
         MainWindow.setCentralWidget(self.centralwidget)
 
         self.retranslateUi(MainWindow)

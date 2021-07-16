@@ -113,7 +113,7 @@ class MyMainForm(QtWidgets.QMainWindow):
         pass
 
     def trace_log(self, msg, level=None):
-        self.ui.textEdit.insertPlainText(msg+"\r\n")
+        self.ui.textBrowser.append(msg)
         func.trace_log(msg, level)
 
     # 核心逻辑

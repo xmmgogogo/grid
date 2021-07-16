@@ -263,13 +263,13 @@
      <string>停止策略</string>
     </property>
    </widget>
-   <widget class="QTextEdit" name="textEdit">
+   <widget class="QTextBrowser" name="textBrowser">
     <property name="geometry">
      <rect>
-      <x>470</x>
-      <y>30</y>
-      <width>411</width>
-      <height>421</height>
+      <x>430</x>
+      <y>20</y>
+      <width>451</width>
+      <height>441</height>
      </rect>
     </property>
    </widget>
