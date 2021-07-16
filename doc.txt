@@ -1,0 +1,19 @@
+学习pyqt5过程
+
+1，安装
+pip install PyQt5
+pip install PyQt5-tools
+
+2，开发过程使用qt-design
+参考：https://www.cnblogs.com/linyfeng/p/11216494.html
+工具安装完成后的路径在..\Python\Python37-32\Lib\site-packages
+找到：designer.exe，进行图形界面编辑，很方便
+
+3，导出ui文件，通过python生成py文件，参考上面教程，配置到pycharm
+python -m PyQt5.uic.pyuic $FileName$ -o $FileNameWithoutExtension$.py
+
+4，直接开发，写具体业务逻辑
+
+5，打包成exe
+pip install pyinstaller
+pyinstaller -F -w -i xxxx.ico main.py

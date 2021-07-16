@@ -1,3 +1,4 @@
+import datetime
 import sys
 from PyQt5 import QtCore, QtGui, QtWidgets
 from grid_ui import Ui_MainWindow
@@ -113,7 +114,8 @@ class MyMainForm(QtWidgets.QMainWindow):
         pass
 
     def trace_log(self, msg, level=None):
-        self.ui.textBrowser.append(msg)
+        time_stamp = datetime.datetime.now()
+        self.ui.textBrowser.append(time_stamp.strftime('%Y-%m-%d %H:%M:%S') + "：" + msg)
         func.trace_log(msg, level)
 
     # 核心逻辑
@@ -394,11 +396,7 @@ class MyMainForm(QtWidgets.QMainWindow):
             func.del_order(conn, order_id)
 
     # 关闭程序，完成清理工作
-    def close_process(self, ex=None):
-        if ex is None:
-            self.trace_log("清理异常")
-            return
-
+    def close_process(self):
         self.trace_log("已手动关闭挂单程序，开始清理工作")
 
         # 取消全部挂单
