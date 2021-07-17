@@ -20,9 +20,9 @@
    <widget class="QLabel" name="exchange_name_label">
     <property name="geometry">
      <rect>
-      <x>90</x>
+      <x>40</x>
       <y>70</y>
-      <width>71</width>
+      <width>51</width>
       <height>21</height>
      </rect>
     </property>
@@ -38,7 +38,7 @@
    <widget class="QLabel" name="symbol_label">
     <property name="geometry">
      <rect>
-      <x>90</x>
+      <x>40</x>
       <y>110</y>
       <width>71</width>
       <height>21</height>
@@ -56,7 +56,7 @@
    <widget class="QLabel" name="grid_min_price_label">
     <property name="geometry">
      <rect>
-      <x>90</x>
+      <x>40</x>
       <y>150</y>
       <width>71</width>
       <height>21</height>
@@ -74,7 +74,7 @@
    <widget class="QLabel" name="grid_max_price_label">
     <property name="geometry">
      <rect>
-      <x>90</x>
+      <x>40</x>
       <y>200</y>
       <width>71</width>
       <height>21</height>
@@ -92,7 +92,7 @@
    <widget class="QLabel" name="grid_num_label">
     <property name="geometry">
      <rect>
-      <x>90</x>
+      <x>40</x>
       <y>250</y>
       <width>71</width>
       <height>21</height>
@@ -110,7 +110,7 @@
    <widget class="QPushButton" name="create_btn">
     <property name="geometry">
      <rect>
-      <x>130</x>
+      <x>80</x>
       <y>410</y>
       <width>91</width>
       <height>31</height>
@@ -134,7 +134,7 @@
    <widget class="QLabel" name="grid_money_label">
     <property name="geometry">
      <rect>
-      <x>90</x>
+      <x>40</x>
       <y>290</y>
       <width>71</width>
       <height>21</height>
@@ -152,7 +152,7 @@
    <widget class="QComboBox" name="exchange_name_list">
     <property name="geometry">
      <rect>
-      <x>170</x>
+      <x>120</x>
       <y>70</y>
       <width>131</width>
       <height>21</height>
@@ -177,7 +177,7 @@
    <widget class="QComboBox" name="symbol_list">
     <property name="geometry">
      <rect>
-      <x>170</x>
+      <x>120</x>
       <y>110</y>
       <width>131</width>
       <height>21</height>
@@ -202,7 +202,7 @@
    <widget class="QLineEdit" name="grid_min_price">
     <property name="geometry">
      <rect>
-      <x>170</x>
+      <x>120</x>
       <y>150</y>
       <width>231</width>
       <height>21</height>
@@ -212,7 +212,7 @@
    <widget class="QLineEdit" name="grid_max_price">
     <property name="geometry">
      <rect>
-      <x>170</x>
+      <x>120</x>
       <y>200</y>
       <width>231</width>
       <height>21</height>
@@ -222,7 +222,7 @@
    <widget class="QLineEdit" name="grid_num">
     <property name="geometry">
      <rect>
-      <x>170</x>
+      <x>120</x>
       <y>250</y>
       <width>231</width>
       <height>21</height>
@@ -232,7 +232,7 @@
    <widget class="QLineEdit" name="grid_money">
     <property name="geometry">
      <rect>
-      <x>170</x>
+      <x>120</x>
       <y>290</y>
       <width>231</width>
       <height>21</height>
@@ -242,7 +242,7 @@
    <widget class="QPushButton" name="stop_btn">
     <property name="geometry">
      <rect>
-      <x>270</x>
+      <x>220</x>
       <y>410</y>
       <width>91</width>
       <height>31</height>
@@ -266,10 +266,10 @@
    <widget class="QTextBrowser" name="textBrowser">
     <property name="geometry">
      <rect>
-      <x>430</x>
+      <x>390</x>
       <y>20</y>
-      <width>451</width>
-      <height>441</height>
+      <width>511</width>
+      <height>451</height>
      </rect>
     </property>
    </widget>

@@ -16,9 +16,18 @@ def init_config_value(cf, conf_file_name):
     with open(conf_file_name, "w+") as f:
         cf.write(f)
 
+
+# 初始化基础配置
+def set_config_value(cf, conf_file_name, option, key, value):
+    cf.read(conf_file_name)
+    cf.set(option, key, value)
+    with open(conf_file_name, "w+") as f:
+        cf.write(f)
+
+
 # 输出log
 def trace_log(msg, level="info"):
-    print(msg)
+    # print(msg)
 
     if level == "info":
         logging.info(msg)

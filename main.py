@@ -1,6 +1,8 @@
 import datetime
+import os
 import sys
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import QThread, pyqtSignal
 from grid_ui import Ui_MainWindow
 
 import configparser
@@ -14,8 +16,8 @@ import func
 import traceback
 
 # 使用 cursor() 方法创建一个游标对象 cursor
-conn = sqlite3.connect('orders.db')
-func.init_db(conn)
+# conn = sqlite3.connect('orders.db')
+# func.init_db(conn)
 
 tm = time.strftime('%Y%m%d', time.localtime(time.time()))
 log_name = tm + '_huobi.log'
@@ -66,8 +68,13 @@ class MyMainForm(QtWidgets.QMainWindow):
         elif self.symbol == "TRX/USDT":
             self.ui.symbol_list.setCurrentIndex(2)
 
+        # self.ui.stop_btn.setDisabled(True)
+
+        # 实例化线程对象
+        self.thread = WorkThreadStart()
+        self.thread.trigger_log.connect(self.log)
+
         # 给button 的 点击动作绑定一个事件处理函数
-        self.ui.stop_btn.setDisabled(True)
         self.ui.create_btn.clicked.connect(self.create_grid)
         self.ui.stop_btn.clicked.connect(self.stop_grid)
 
@@ -91,35 +98,65 @@ class MyMainForm(QtWidgets.QMainWindow):
             cf.write(f)
         pass
 
-    # 创建网格
     def create_grid(self):
-        self.ui.create_btn.setText("策略执行中...")
+        # 创建网格
+        self.ui.create_btn.setText("执行中")
         self.ui.create_btn.setDisabled(True)
-        self.ui.stop_btn.setDisabled(False)
+        # self.ui.stop_btn.setDisabled(False)
 
         # 读取用户配置并写入config.ini
         self.save_setting()
 
-        # 执行主逻辑
-        self.main()
+        # 启动线程
+        self.thread.start()
 
-    # 关闭网格
     def stop_grid(self):
+        # 关闭网格
         self.ui.create_btn.setText("创建策略")
         self.ui.create_btn.setDisabled(False)
-        self.ui.stop_btn.setDisabled(True)
+        # self.ui.stop_btn.setDisabled(True)
 
         # 执行关闭
-        self.close_process()
+        # self.thread.start() # sqlite3.ProgrammingError: SQLite objects created
+        self.thread.core_stop()
+
+    def log(self, msg):
+        # 向列表控件中添加条目
+        time_stamp = datetime.datetime.now()
+        self.ui.textBrowser.append(time_stamp.strftime('%Y-%m-%d %H:%M:%S') + " " + msg)
         pass
 
-    def trace_log(self, msg, level=None):
-        time_stamp = datetime.datetime.now()
-        self.ui.textBrowser.append(time_stamp.strftime('%Y-%m-%d %H:%M:%S') + "：" + msg)
-        func.trace_log(msg, level)
 
+class WorkThreadStart(QThread):
+    # 自定义信号对象。参数str就代表这个信号可以传一个字符串
+    trigger_log = pyqtSignal(str)
+    # 因为sqlite3原因，不能在2个thread里面操作，所以写到这里
+    conn = ""
+
+    def __init__(self, parent=None):
+        super(WorkThreadStart, self).__init__(parent)
+
+        self.ex = exchange.Exchange()
+
+    def run(self):
+        self.trace_log("策略正在初始化...")
+
+        # 初始化配置
+        func.init_config_value(cf, conf_file_name)
+        cf.read(conf_file_name)
+
+        # 使用 cursor() 方法创建一个游标对象 cursor
+        self.conn = sqlite3.connect('orders.db')
+        func.init_db(self.conn)
+
+        # 执行主逻辑
+        self.core_start()
+        self.conn.close()  # TODO
+
+    # 策略核心类
     # 核心逻辑
-    def main(self):
+    def core_start(self):
+        conn = self.conn
         try:
             # 获取当前价，判断购买的仓位比例，比如当前价格在网格的1/5位置
             grid_max_price = cf.getfloat("all", "grid_max_price")  # 网格最大值
@@ -138,9 +175,10 @@ class MyMainForm(QtWidgets.QMainWindow):
                 self.trace_log("设置的网格购买金额太小，无意义" + str(grid_money), "error")
                 return
 
+            self.trace_log("基础配置校验完成")
+
             # 初始化
-            ex = exchange.Exchange()
-            self.ex = ex
+            ex = self.ex
             # 交易对基础信息，比如TRX=5
             market_symbol_info = ex.fetch_markets()
             if market_symbol_info is None:
@@ -234,7 +272,7 @@ class MyMainForm(QtWidgets.QMainWindow):
                 #  确认购买订单之后，开始挂单
                 while True:
                     first_order_info = ex.fetch_order(take_order['id'])
-                    self.trace_log("首次下单数据，订单返回信息："+json.dumps(first_order_info))
+                    self.trace_log("首次下单数据，订单返回信息：" + json.dumps(first_order_info))
                     if first_order_info is not None and first_order_info.get("status") == "closed":
                         # 顺便计算当前买币手续费
                         buy_fee_rate = float(first_order_info.get("fee").get("cost") / first_order_info.get("amount"))
@@ -260,7 +298,7 @@ class MyMainForm(QtWidgets.QMainWindow):
                 for cur_price in grid_list:
                     if cur_price > now_price:
                         # 里面挂卖单
-                        tmp_one_grid_amount = func.round_down(one_grid_amount * (1-buy_fee_rate), amount_precision)  # 扣手续费
+                        tmp_one_grid_amount = func.round_down(one_grid_amount * (1 - buy_fee_rate), amount_precision)  # 扣手续费
                         self.trace_log(f"""轮询挂[sell]单，现价{now_price}:，挂单价{cur_price}:，计划挂单数量{tmp_one_grid_amount}""")
                         take_order = ex.create_order("limit", "sell", tmp_one_grid_amount, cur_price)
                         if take_order is None:
@@ -295,20 +333,31 @@ class MyMainForm(QtWidgets.QMainWindow):
                     # 实时读取配置，如果已关闭策略则进行相关动作
                     cf.read(conf_file_name)
                     if cf.getboolean("setting", "is_close"):
-                        self.close_process(ex)
+                        # self.core_stop()
+
+                        self.trace_log("开始清理工作")
+                        # 清空数据库订单表
+                        func.del_all_order(conn)
+                        func.del_config(conn)
+
+                        # 取消全部挂单
+                        self.ex.batch_cancel_open_orders()
+                        self.trace_log("清理工作，已完成")
                         break
 
                     results = func.get_all_order(conn)
                     for row in results:
                         # 业务处理层
-                        self.order_check_in(ex, row, one_grid_amount, grid_list, buy_fee_rate, amount_precision)
+                        self.order_check_in(row, one_grid_amount, grid_list, buy_fee_rate, amount_precision)
                         time.sleep(5)
         except Exception as e:
             # self.trace_log("主进程异常退出，" + str(e))
             self.trace_log("主进程异常退出，" + str(traceback.print_exc()))
 
     # 订单业务逻辑
-    def order_check_in(self, ex, row, one_grid_amount, grid_list, buy_fee_rate, amount_precision):
+    def order_check_in(self, row, one_grid_amount, grid_list, buy_fee_rate, amount_precision):
+        conn = self.conn
+
         order_id = row[1]
         side = row[2]
         price = row[3]
@@ -320,11 +369,8 @@ class MyMainForm(QtWidgets.QMainWindow):
         # 防止服务器请求异常
         while True:
             try:
-                order_status = ex.fetch_order_status(order_id)
+                order_status = self.ex.fetch_order_status(order_id)
                 self.trace_log(f"""order_id:{order_id}, status:{order_status}""")
-                # balance = ex.fetch_balance()
-                # if balance['USDT']['free'] < 30:
-                #     print("没钱了，不测试了", balance['USDT']['free'])
                 break
             except Exception as e:
                 self.trace_log("请求异常，1秒后重试，" + str(e), "error")
@@ -332,27 +378,26 @@ class MyMainForm(QtWidgets.QMainWindow):
                 continue
 
         # TODO 这里考虑网格跑到外面的情况
-
         if order_status is None:
             self.trace_log("订单状态异常" + json.dumps([order_id, order_status]), "error")
             return
 
         if order_status == 'closed':
             if side == "buy":
-                self.trace_log('[buy]订单成交，订单ID='+order_id)
+                self.trace_log('[buy]订单成交，订单ID=' + order_id)
 
                 # 越界判断
                 if line_num < len(grid_list):
                     cur_price = grid_list[line_num + 1 - 1]
-                    self.trace_log(f"""[buy]订单成交，当前格子索引:{line_num-1}，挂[sell]索引:{line_num}""")
+                    self.trace_log(f"""[buy]订单成交，当前格子索引:{line_num - 1}，挂[sell]索引:{line_num}""")
 
                     # 需要判断上一层有没有挂单，如果挂了，则不挂
                     order_info = func.get_order_by_line(conn, line_num + 1)
                     if order_info is None:
                         # 挂卖单需要计算手续费扣除情况
-                        one_grid_amount = func.round_down(one_grid_amount * (1-buy_fee_rate), amount_precision)
+                        one_grid_amount = func.round_down(one_grid_amount * (1 - buy_fee_rate), amount_precision)
                         self.trace_log(f"""[buy]订单成交，挂[sell]价格:{cur_price}，[sell]数量:{one_grid_amount}""")
-                        take_order = ex.create_order("limit", "sell", one_grid_amount, cur_price)
+                        take_order = self.ex.create_order("limit", "sell", one_grid_amount, cur_price)
                         if take_order is None:
                             self.trace_log("[buy]订单成交，挂[sell]初始下单失败," + json.dumps([one_grid_amount, cur_price]))
                             return
@@ -365,18 +410,18 @@ class MyMainForm(QtWidgets.QMainWindow):
                 else:
                     self.trace_log(f"""[buy]订单成交，越界判断，当前网格：{line_num}""")
             elif side == "sell":
-                self.trace_log('[sell]订单成交，订单ID='+order_id)
+                self.trace_log('[sell]订单成交，订单ID=' + order_id)
 
                 # 越界判断
                 if line_num > 1:
                     cur_price = grid_list[line_num - 1 - 1]
-                    self.trace_log(f"""[sell]订单成交，当前格子索引:{line_num-1}，挂[buy]索引:{line_num-2}""")
+                    self.trace_log(f"""[sell]订单成交，当前格子索引:{line_num - 1}，挂[buy]索引:{line_num - 2}""")
 
                     # 需要判断下一层有没有挂单，如果挂了，则不挂
                     order_info = func.get_order_by_line(conn, line_num - 1)
                     if order_info is None:
                         self.trace_log(f"""[sell]订单成交，挂[buy]价格:{cur_price}，[buy]数量:{one_grid_amount}""")
-                        take_order = ex.create_order("limit", "buy", one_grid_amount, cur_price)
+                        take_order = self.ex.create_order("limit", "buy", one_grid_amount, cur_price)
                         if take_order is None:
                             self.trace_log("[sell]订单成交，挂[buy]初始下单失败," + json.dumps([one_grid_amount, cur_price]))
                             return
@@ -396,18 +441,37 @@ class MyMainForm(QtWidgets.QMainWindow):
             func.del_order(conn, order_id)
 
     # 关闭程序，完成清理工作
-    def close_process(self):
-        self.trace_log("已手动关闭挂单程序，开始清理工作")
+    def core_stop(self):
+        self.trace_log("已停止策略，开始清理工作倒计时...")
+
+        # 设置config.ini为关闭
+        func.set_config_value(cf, conf_file_name, "setting", "is_close", "1")
+
+        # 清空数据库订单表
+        # conn = self.conn
+        # func.del_all_order(conn)
+        # func.del_config(conn)
+
+        # 为了解决sqlite不同thread问题，这里我需要删除文件 TODO 临时这么弄
+        try:
+            if os.path.exists("orders.db"):
+                os.remove("orders.db")
+        except:
+            pass
 
         # 取消全部挂单
         self.ex.batch_cancel_open_orders()
 
-        # 清空数据库订单表
-        func.del_all_order(conn)
-        func.del_config(conn)
-
         self.trace_log("清理工作，已完成")
         pass
+
+    # 输出log
+    def trace_log(self, msg, level=None):
+        # 写入界面接收器
+        self.trigger_log.emit(msg)
+
+        # 系统日常log
+        func.trace_log(msg, level)
 
 
 if __name__ == '__main__':
