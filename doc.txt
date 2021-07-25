@@ -16,4 +16,4 @@ python -m PyQt5.uic.pyuic $FileName$ -o $FileNameWithoutExtension$.py
 
 5，打包成exe
 pip install pyinstaller
-pyinstaller -F -w -i xxxx.ico main.py
+pyinstaller -F -w -i favicon(blinklist_icon).ico main.py
